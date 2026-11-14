@@ -83,11 +83,31 @@ abstract class Player(val name: String) {
 class HumanPlayer(name: String) : Player(name) {
     override val isHuman = true
 
-    // TODO: Mostrar solo acciones posibles
     override fun chooseAction(game: Game): Action {
         while (true) {
             println("\nMano de $name:")
-            hand.forEachIndexed { i, c -> println("  ${i + 1}. ${c.label.padEnd(22)} (${c.description})") }
+            hand.sort()
+
+            var cardRepeated = 0
+            var printedCards = 0
+            var lastCard: CardType? = null
+            hand.forEachIndexed { i, card ->
+                if(card == lastCard) {
+                    cardRepeated += 1
+                } else {
+                    if(lastCard != null) {
+                        println("  ${printedCards + 1}. ${lastCard.label} x${cardRepeated+1} \t\t(${lastCard.description})")
+                        printedCards += 1
+                    }
+                    cardRepeated = 0
+                }
+                if (i == hand.size-1) {
+                    println("  ${printedCards + 1}. ${card.label} x${cardRepeated+1} \t\t(${card.description})")
+                }
+
+                lastCard = card
+            }
+
             println("  0. Robar carta y terminar turno")
             val choice = readInt("Elige una opción: ", 0..hand.size)
             if (choice == 0) return Action.Draw
