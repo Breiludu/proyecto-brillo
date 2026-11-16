@@ -4,7 +4,9 @@ default: run
 run: build
 	java -jar ExplodingKittens.jar
 
-build: ExplodingKittens.kt
+build: ExplodingKittens.jar
+
+ExplodingKittens.jar: ExplodingKittens.kt
 	../bin/kotlinc ExplodingKittens.kt -include-runtime -d ExplodingKittens.jar
 
 clean:
