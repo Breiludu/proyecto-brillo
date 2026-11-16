@@ -111,7 +111,7 @@ abstract class Player(val name: String) {
     // Action results
     abstract fun favor(action: Action): CardType
     abstract fun chooseCard(discardPile: List<CardType>): CardType
-    abstract fun explodingKittenPosition(): Int
+    abstract fun explodingKittenPosition(game: Game): Int
     abstract fun sawFuture(cards: List<CardType>)
 }
 
@@ -153,12 +153,7 @@ class HumanPlayer(name: String) : Player(name) {
                     repeat(kittensToPlay) { kittens.add(card) }
 
                     // TODO: nobody selectable
-                    val others = game.players.filter { it != this && it.hand.size > 0 }
-                    others.forEachIndexed { i, player ->
-                        println("${i}. ${player.name}")
-                    }
-                    val targetIdx = readInt("Elige un jugador para robar carta: ", 0..(others.size-1))
-                    val target = others[targetIdx]
+                    val target = selectPlayer(game)
                     if(kittensToPlay == 2) {
                         return Action(this, ActionType.PLAY_KITTENS, target = target, kittens = kittens)
                     }
@@ -168,6 +163,12 @@ class HumanPlayer(name: String) : Player(name) {
                     var stealCard = CardType.fromString(readln())
                     return Action(this, ActionType.PLAY_KITTENS, card = stealCard, target = target, kittens = kittens)
                 }
+                // TODO: five kittens
+
+                card == CardType.FAVOR -> {
+                    val target = selectPlayer(game)
+                    return Action(this, ActionType.PLAY_CARD, card, target = target)
+                }
 
                 else -> return Action(this, ActionType.PLAY_CARD, card)
             }
@@ -175,17 +176,60 @@ class HumanPlayer(name: String) : Player(name) {
         }
     }
 
-    override fun nopes(action: Action, alreadyNoped: Boolean): Boolean { return false }
+    override fun nopes(action: Action, alreadyNoped: Boolean): Boolean {
+        if(action.kittens == null) {
+            println("${action.actor.name} is playing ${action.card}")
+        } else {
+            println("${action.actor.name} is playing ${action.kittens.size}x ${action.kittens[0]}")
+        }
+        if(action.target != null) {
+            println("Target: ${action.target.name}")
+        }
+        if(alreadyNoped) {
+            println("This action was already noped!!")
+        }
 
-    override fun favor(action: Action): CardType { return hand[Random.nextInt(hand.size)] }
+        val choice = readInt("Dou you want to nope? (0 = no, 1 = yes) ", 0..1)
+        if(choice == 1) {
+            return true
+        } else {
+            return false
+        }
+    }
+
+    override fun favor(action: Action): CardType {
+        println("${action.actor.name} is requesting a favor from you.")
+
+        val printableHand = hand.distinct()
+        printableHand.forEachIndexed { i, card ->
+            println("  ${i+1}. ${count(card)}x ${card.label.padEnd(22)} (${card.getDesc()})")
+        }
+        val choice = readInt("Elige una carta para dar: ", 1..printableHand.size)
+        return printableHand[choice]
+    }
 
     override fun chooseCard(discardPile: List<CardType>): CardType {
         return discardPile[Random.nextInt(discardPile.size)]
     }
 
-    override fun explodingKittenPosition(): Int { return 0 }
+    override fun explodingKittenPosition(game: Game): Int {
+        println("You defused an Exploding Kitten!!")
+        val choice = readInt("Where dou you want to place it? [0,${game.deck.getSize()-1}] ", 0..game.deck.getSize()-1)
+        return choice
+    }
 
-    override fun sawFuture(cards: List<CardType>) { }
+    override fun sawFuture(cards: List<CardType>) {
+        println("You saw the future: ${cards[0]}, ${cards[1]}, ${cards[2]}")
+    }
+
+    private fun selectPlayer(game: Game): Player {
+        val others = game.players.filter { it != this && it.hand.size > 0 }
+        others.forEachIndexed { i, player ->
+            println("${i+1}. ${player.name}")
+        }
+        val targetIdx = readInt("Elige un jugador para robar carta: ", 1..others.size)
+        return others[targetIdx-1]
+    }
 }
 
 class AllwaysDrawBot(name: String) : Player(name) {
@@ -201,7 +245,7 @@ class AllwaysDrawBot(name: String) : Player(name) {
         return discardPile[Random.nextInt(discardPile.size)]
     }
 
-    override fun explodingKittenPosition(): Int { return 0 }
+    override fun explodingKittenPosition(game: Game): Int { return 0 }
 
     override fun sawFuture(cards: List<CardType>) { }
 }
@@ -209,7 +253,7 @@ class AllwaysDrawBot(name: String) : Player(name) {
 // ---------------------------------------------------------------- Juego
 
 class Game(val players: List<Player>) {
-    private val deck: Deck
+    val deck: Deck
     // TODO: handle discard pile
     private val discardPile = mutableListOf<CardType>()
     private var playerTurn: Int
@@ -332,7 +376,7 @@ class Game(val players: List<Player>) {
             player.hand.remove(CardType.DEFUSE)
             announce(player, "${player.name} usa un Defuse y desactiva al gatito.")
 
-            val newPosition = player.explodingKittenPosition()
+            val newPosition = player.explodingKittenPosition(this)
             deck.insert(CardType.EXPLODING_KITTEN, newPosition)
             announce(player, "${player.name} vuelve a esconder el gatito en el mazo...")
             return TurnResult.DREW
