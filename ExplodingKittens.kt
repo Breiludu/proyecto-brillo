@@ -78,7 +78,7 @@ enum class TurnResult {
 abstract class Player(val name: String) {
     val hand = mutableListOf<CardType>()
     var alive = true
-    val isHuman = false
+    abstract val isHuman: Boolean
 
     fun has(card: CardType) = card in hand
     fun count(card: CardType) = hand.count { it == card }
@@ -87,10 +87,30 @@ abstract class Player(val name: String) {
     abstract fun nopes(action: Action, alreadyNoped: Boolean): Boolean
     // Action results
     abstract fun favor(action: Action): CardType
-    abstract fun chooseCard(discardPile: Deck): CardType
+    abstract fun chooseCard(discardPile: List<CardType>): CardType
     abstract fun explodingKittenPosition(): Int
     abstract fun sawFuture(cards: List<CardType>)
 }
+
+class AllwaysDrawBot(name: String) : Player(name) {
+    override val isHuman = false
+
+    override fun act(): Action { return Action(this, ActionType.DRAW) }
+
+    override fun nopes(action: Action, alreadyNoped: Boolean): Boolean { return false }
+
+    override fun favor(action: Action): CardType { return hand[Random.nextInt(hand.size)] }
+
+    override fun chooseCard(discardPile: List<CardType>): CardType {
+        return discardPile[Random.nextInt(discardPile.size)]
+    }
+
+    override fun explodingKittenPosition(): Int { return 0 }
+
+    override fun sawFuture(cards: List<CardType>) { }
+}
+
+// ---------------------------------------------------------------- Juego
 
 class Game(private val players: List<Player>) {
     private val deck: Deck
@@ -290,7 +310,7 @@ class Game(private val players: List<Player>) {
 
             5 -> {
                 announce(player, "${player.name} juega cinco gatos.")
-                val chosen = player.chooseCard(deck)
+                val chosen = player.chooseCard(discardPile)
                 discardPile.remove(chosen)
                 player.hand.add(chosen)
             }
@@ -321,5 +341,12 @@ class Game(private val players: List<Player>) {
 }
 
 fun main() {
+
+    var players = listOf(
+        AllwaysDrawBot("DrawBot1"),
+        AllwaysDrawBot("DrawBot2")
+    )
+
+    Game(players).run()
 
 }
