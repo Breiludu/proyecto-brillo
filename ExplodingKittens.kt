@@ -397,6 +397,14 @@ class Game(val players: List<Player>) {
             if(action.type == ActionType.DRAW) {
                 return drawCard(player)
             }
+
+            // Remove from player hand
+            if(action.card != null && action.kittens == null) {
+                player.hand.remove(action.card)
+            }
+            if(action.kittens != null) {
+                for (kitten in action.kittens) { player.hand.remove(kitten) }
+            }
             
             // Nope round
             if(doNopeRound(action)) { continue }
@@ -447,7 +455,6 @@ class Game(val players: List<Player>) {
     private fun playCard(player: Player, action: Action): TurnResult? {
         val card = action.card!!
         var target: Player? = action.target
-        player.hand.remove(card)
 
         val targetText = target?.let { " to ${it.name}" } ?: ""
         announce(player, "${player.name} plays ${card.label}$targetText.")
@@ -476,9 +483,7 @@ class Game(val players: List<Player>) {
     private fun playKittens(player: Player, action: Action) {
         val target = action.target!!
 
-        for (kitten in action.kittens!!) { player.hand.remove(kitten) }
-
-        when(action.kittens.size) {
+        when(action.kittens!!.size) {
             2 -> {
                 announce(player, "${player.name} plays a pair of ${action.kittens[0].label} against ${target.name}.")
                 // TODO: pick number?
