@@ -20,15 +20,15 @@ enum class CardType(val label: String, val isCat: Boolean = false) {
 
     fun getDesc(): String {
         when(this) {
-            EXPLODING_KITTEN -> return "Si la robas sin Defuse, explotas"
-            DEFUSE           -> return "Te salva de un Exploding Kitten"
-            ATTACK           -> return "Terminas sin robar; el siguiente juega 2 turnos"
-            SKIP             -> return "Terminas un turno sin robar"
-            FAVOR            -> return "Otro jugador te da una carta a su elección"
-            SHUFFLE          -> return "Baraja el mazo"
-            SEE_THE_FUTURE   -> return "Mira las 3 primeras cartas del mazo"
-            NOPE             -> return "Cancela una acción (solo como respuesta)"
-            else             -> return "Juega una pareja para robar una carta al azar"
+            EXPLODING_KITTEN -> return "If you draw it without Defuse, kaboom"
+            DEFUSE           -> return "Saves you from an Exploding Kitten"
+            ATTACK           -> return "Ends turn without drawing; next player gets two turns"
+            SKIP             -> return "Ends turn without drawing"
+            FAVOR            -> return "Another player gives you a card of his choice"
+            SHUFFLE          -> return "Shuffles the deck"
+            SEE_THE_FUTURE   -> return "See the first three cards of the deck"
+            NOPE             -> return "Denies an acction (only as a response)"
+            else             -> return "Play them in groups to steal cards"
             // TODO: Añadir desc para tres y cinco cartas de gato
         }
     }
@@ -120,7 +120,7 @@ class HumanPlayer(name: String) : Player(name) {
 
     override fun act(game: Game): Action {
         while (true) {
-            println("\nMano de $name:")
+            println("\nHand of $name:")
             hand.sort()
 
             val printableHand = hand.distinct()
@@ -128,25 +128,25 @@ class HumanPlayer(name: String) : Player(name) {
                 println("  ${i+1}. ${count(card)}x ${card.label.padEnd(22)} (${card.getDesc()})")
             }
 
-            println("  0. Robar carta y terminar turno")
-            val choice = readInt("Elige una opción: ", 0..printableHand.size)
+            println("  0. Draw a card and end turn")
+            val choice = readInt("Choose an option: ", 0..printableHand.size)
             if (choice == 0) return Action(this, ActionType.DRAW)
 
             val card = printableHand[choice - 1]
             when {
                 // --- Not Allowed ---
                 card == CardType.DEFUSE ->
-                    println("El Defuse se usa automáticamente al robar un Exploding Kitten.")
+                    println("Defuse is used automatically when drawing an Exploding Kitten.")
                 card == CardType.NOPE ->
-                    println("El Nope solo se juega en respuesta a la acción de otro jugador.")
+                    println("Nope is only played as a response to another player action.")
                 card.isCat && (count(card) < 2 || count(card) > 3) ->
-                    println("Necesitas dos o tres ${card.label} para jugarlas.")
+                    println("You need al least two ${card.label} to play them.")
 
                 // --- Cats ---
                 card.isCat -> {
                     var kittensToPlay = 2
                     if(count(card) > 2) {
-                        kittensToPlay = readInt("Cuántos quieres jugar? ", 2..3)
+                        kittensToPlay = readInt("How many do you want to play? ", 2..3)
                     }
 
                     val kittens = mutableListOf<CardType>()
@@ -159,7 +159,7 @@ class HumanPlayer(name: String) : Player(name) {
                     }
 
                     // Three kittens
-                    print("Elige una carta para robar: ")
+                    print("Choose a card to steal: ")
                     var stealCard = CardType.fromString(readln())
                     return Action(this, ActionType.PLAY_KITTENS, card = stealCard, target = target, kittens = kittens)
                 }
@@ -204,7 +204,7 @@ class HumanPlayer(name: String) : Player(name) {
         printableHand.forEachIndexed { i, card ->
             println("  ${i+1}. ${count(card)}x ${card.label.padEnd(22)} (${card.getDesc()})")
         }
-        val choice = readInt("Elige una carta para dar: ", 1..printableHand.size)
+        val choice = readInt("Choose a card to give: ", 1..printableHand.size)
         return printableHand[choice]
     }
 
@@ -214,12 +214,12 @@ class HumanPlayer(name: String) : Player(name) {
 
     override fun explodingKittenPosition(game: Game): Int {
         println("You defused an Exploding Kitten!!")
-        val choice = readInt("Where dou you want to place it? [0,${game.deck.getSize()-1}] ", 0..game.deck.getSize()-1)
+        val choice = readInt("Where dou you want to place it? [0-${game.deck.getSize()-1}] ", 0..game.deck.getSize()-1)
         return choice
     }
 
     override fun sawFuture(cards: List<CardType>) {
-        println("You saw the future: ${cards[0]}, ${cards[1]}, ${cards[2]}")
+        println("You saw the future: ${cards[0].label}, ${cards[1].label}, ${cards[2].label}")
     }
 
     private fun selectPlayer(game: Game): Player {
@@ -227,7 +227,7 @@ class HumanPlayer(name: String) : Player(name) {
         others.forEachIndexed { i, player ->
             println("${i+1}. ${player.name}")
         }
-        val targetIdx = readInt("Elige un jugador para robar carta: ", 1..others.size)
+        val targetIdx = readInt("Select a player to steal a card from: ", 1..others.size)
         return others[targetIdx-1]
     }
 }
@@ -312,10 +312,9 @@ class Game(val players: List<Player>) {
             }
         }
 
-        // TODO: mensaje de victoria
-        // println("\n==============================================")
-        // println("  ¡${alivePlayers().first().name} gana la partida!")
-        // println("==============================================")
+        println("\n==============================================")
+        println("  ${alivePlayers().first().name} wins the game!")
+        println("==============================================")
     }
 
     // Siguiente jugador (vivo)
@@ -332,9 +331,9 @@ class Game(val players: List<Player>) {
         // Print turn info
         println("\n----------------------------------------------")
         val extra = if (turnsLeft > 1) " (le quedan $turnsLeft turnos)" else ""
-        println("Turno de ${player.name}$extra")
-        println("Cartas en el mazo: ${deck.getSize()}")
-        alivePlayers().forEach { println("  ${it.name}: ${it.hand.size} cartas") }
+        println("Turn of ${player.name}$extra")
+        println("Cards in the deck: ${deck.getSize()}")
+        alivePlayers().forEach { println("  ${it.name}: ${it.hand.size} cards") }
 
         while (true) {
             val action = player.act(this)
@@ -365,25 +364,25 @@ class Game(val players: List<Player>) {
         // Normal card
         if (card != CardType.EXPLODING_KITTEN) {
             player.hand.add(card)
-            announce(player, "${player.name} roba una carta.")
-            if (player.isHuman) println("Has robado: ${card.label}")
+            announce(player, "${player.name} draws a card.")
+            if (player.isHuman) println("You stole: ${card.label}")
             return TurnResult.DREW
         }
 
         // Exploding Kitten defused
-        announce(player, "¡¡${player.name} ha robado un EXPLODING KITTEN!!")
+        announce(player, "¡¡${player.name} drew an EXPLODING KITTEN!!")
         if (player.has(CardType.DEFUSE)) {
             player.hand.remove(CardType.DEFUSE)
-            announce(player, "${player.name} usa un Defuse y desactiva al gatito.")
+            announce(player, "${player.name} uses a Defuse and deactivates the kitten.")
 
             val newPosition = player.explodingKittenPosition(this)
             deck.insert(CardType.EXPLODING_KITTEN, newPosition)
-            announce(player, "${player.name} vuelve a esconder el gatito en el mazo...")
+            announce(player, "${player.name} hides the kitten again in the deck...")
             return TurnResult.DREW
         }
 
         // Exploding Kitten actually exploded
-        announce(player, "BOOM. ${player.name} ha explotado y queda eliminado.")
+        announce(player, "BOOM. ${player.name} was blown up by a kitten.")
         player.alive = false
         player.hand.clear()
         return TurnResult.EXPLODED
@@ -395,8 +394,8 @@ class Game(val players: List<Player>) {
         var target: Player? = action.target
         player.hand.remove(card)
 
-        val targetText = target?.let { " a ${it.name}" } ?: ""
-        announce(player, "${player.name} juega ${card.label}$targetText.")
+        val targetText = target?.let { " to ${it.name}" } ?: ""
+        announce(player, "${player.name} plays ${card.label}$targetText.")
 
         when (card) {
             CardType.SKIP -> return TurnResult.SKIPPED
@@ -404,14 +403,14 @@ class Game(val players: List<Player>) {
             CardType.SEE_THE_FUTURE -> player.sawFuture(deck.peek(3))
             CardType.SHUFFLE -> {
                 deck.shuffle()
-                announce(player, "El mazo ha sido barajado.")
+                announce(player, "The deck has been shuffled.")
             }
             CardType.FAVOR -> {
                 val given = target!!.favor(action)
                 target.hand.remove(given)
                 player.hand.add(given)
-                announce(player, "${target.name} le da una carta a ${player.name}.")
-                if (player.isHuman) println("Has recibido: ${given.label}")
+                announce(player, "${target.name} gives a card to ${player.name}.")
+                if (player.isHuman) println("You received: ${given.label}")
             }
             else -> {}
         }
@@ -426,29 +425,29 @@ class Game(val players: List<Player>) {
 
         when(action.kittens.size) {
             2 -> {
-                announce(player, "${player.name} juega una pareja de ${action.kittens[0].label} contra ${target.name}.")
+                announce(player, "${player.name} plays a pair of ${action.kittens[0].label} against ${target.name}.")
                 // TODO: pick number?
                 val stolen = target.hand.removeAt(Random.nextInt(target.hand.size))
                 player.hand.add(stolen)
-                announce(player, "${player.name} le roba una carta a ${target.name}.")
-                if (player.isHuman) println("Has robado: ${stolen.label}")
-                if (target.isHuman) println("[${target.name}] Te han robado: ${stolen.label}")
+                announce(player, "${player.name} steals a card from ${target.name}.")
+                if (player.isHuman) println("You stole: ${stolen.label}")
+                if (target.isHuman) println("[${target.name}] They stole you: ${stolen.label}")
             }
 
             3 -> {
-                announce(player, "${player.name} juega un trio de ${action.kittens[0].label} contra ${target.name}.")
-                announce(player, "${player.name} pide la carta ${action.card!!.label}.")
+                announce(player, "${player.name} plays a trio of ${action.kittens[0].label} against ${target.name}.")
+                announce(player, "${player.name} requests the card ${action.card!!.label}.")
                 if(target.has(action.card)) {
                     target.hand.remove(action.card)
                     player.hand.add(action.card)
-                    announce(player, "${player.name} le roba una carta a ${target.name}.")
-                    if (player.isHuman) println("Has robado: ${action.card.label}")
-                    if (target.isHuman) println("[${target.name}] Te han robado: ${action.card.label}")
+                    announce(player, "${player.name} steals a card from ${target.name}.")
+                    if (player.isHuman) println("You stole: ${action.card.label}")
+                    if (target.isHuman) println("[${target.name}] They stole you: ${action.card.label}")
                 }
             }
 
             5 -> {
-                announce(player, "${player.name} juega cinco gatos.")
+                announce(player, "${player.name} plays five kittens.")
                 val chosen = player.chooseCard(discardPile)
                 discardPile.remove(chosen)
                 player.hand.add(chosen)
@@ -485,7 +484,7 @@ fun readInt(msg: String, range: IntRange): Int {
         val line = readlnOrNull() ?: continue
         val n = line.trim().toIntOrNull()
         if (n != null && n in range) return n
-        println("Introduce un número entre ${range.first} y ${range.last}.")
+        println("Select a number between ${range.first} and ${range.last}.")
     }
 }
 
