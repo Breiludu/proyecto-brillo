@@ -29,7 +29,7 @@ enum class CardType(val label: String, val isCat: Boolean = false) {
             SEE_THE_FUTURE   -> return "See the first three cards of the deck"
             NOPE             -> return "Denies an acction (only as a response)"
             else             -> return "Play them in groups to steal cards"
-            // TODO: Añadir desc para tres y cinco cartas de gato
+            // TODO: Cinco cartas de gato
         }
     }
 
@@ -178,9 +178,9 @@ class HumanPlayer(name: String) : Player(name) {
 
     override fun nopes(action: Action, alreadyNoped: Boolean): Boolean {
         if(action.kittens == null) {
-            println("${action.actor.name} is playing ${action.card}")
+            println("${action.actor.name} is playing ${action.card!!.label}")
         } else {
-            println("${action.actor.name} is playing ${action.kittens.size}x ${action.kittens[0]}")
+            println("${action.actor.name} is playing ${action.kittens.size}x ${action.kittens[0].label}")
         }
         if(action.target != null) {
             println("Target: ${action.target.name}")
@@ -205,7 +205,7 @@ class HumanPlayer(name: String) : Player(name) {
             println("  ${i+1}. ${count(card)}x ${card.label.padEnd(22)} (${card.getDesc()})")
         }
         val choice = readInt("Choose a card to give: ", 1..printableHand.size)
-        return printableHand[choice]
+        return printableHand[choice-1]
     }
 
     override fun chooseCard(discardPile: List<CardType>): CardType {
@@ -223,7 +223,7 @@ class HumanPlayer(name: String) : Player(name) {
     }
 
     private fun selectPlayer(game: Game): Player {
-        val others = game.players.filter { it != this && it.hand.size > 0 }
+        val others = game.players.filter { it != this && it.hand.size > 0 && it.alive }
         others.forEachIndexed { i, player ->
             println("${i+1}. ${player.name}")
         }
@@ -246,6 +246,61 @@ class AllwaysDrawBot(name: String) : Player(name) {
     }
 
     override fun explodingKittenPosition(game: Game): Int { return 0 }
+
+    override fun sawFuture(cards: List<CardType>) { }
+}
+
+class RandomBot(name: String) : Player(name) {
+    override val isHuman = false
+
+    override fun act(game: Game): Action {
+        val targets = game.players.filter { it != this && it.alive && it.hand.isNotEmpty() }
+
+        // Every possible action
+        val options = mutableListOf(Action(this, ActionType.DRAW))
+
+        for (card in hand.distinct()) {
+            when {
+                card == CardType.DEFUSE || card == CardType.NOPE ||
+                card == CardType.EXPLODING_KITTEN -> {}
+
+                card == CardType.FAVOR ->
+                    targets.forEach { options.add(Action(this, ActionType.PLAY_CARD, card, target = it)) }
+
+                card.isCat -> {
+                    val n = count(card)
+                    for (t in targets) {
+                        if (n >= 2) {
+                            options.add(Action(this, ActionType.PLAY_KITTENS,
+                                kittens = List(2) { card }, target = t))
+                        }
+                        if (n >= 3) {
+                            val wanted = CardType.entries
+                                .filter { it != CardType.EXPLODING_KITTEN }
+                                .random()
+                            options.add(Action(this, ActionType.PLAY_KITTENS,
+                                card = wanted, kittens = List(3) { card }, target = t))
+                        }
+                    }
+                }
+
+                else -> options.add(Action(this, ActionType.PLAY_CARD, card))
+            }
+        }
+
+        return options.random()
+    }
+
+    // Solo se le pregunta si tiene un Nope; decide con un 30% de probabilidad
+    override fun nopes(action: Action, alreadyNoped: Boolean): Boolean =
+        Random.nextInt(100) < 30
+
+    override fun favor(action: Action): CardType = hand.random()
+
+    override fun chooseCard(discardPile: List<CardType>): CardType = discardPile.random()
+
+    override fun explodingKittenPosition(game: Game): Int =
+        Random.nextInt(0, game.deck.getSize() + 1)
 
     override fun sawFuture(cards: List<CardType>) { }
 }
@@ -365,7 +420,7 @@ class Game(val players: List<Player>) {
         if (card != CardType.EXPLODING_KITTEN) {
             player.hand.add(card)
             announce(player, "${player.name} draws a card.")
-            if (player.isHuman) println("You stole: ${card.label}")
+            if (player.isHuman) println("You drew: ${card.label}")
             return TurnResult.DREW
         }
 
@@ -466,6 +521,7 @@ class Game(val players: List<Player>) {
 
             for (np in nopingPlayers) {
                 if(np.nopes(action, noped)) {
+                    println("${np.name} noped the action.")
                     noped = !noped
                     last = np
                     np.hand.remove(CardType.NOPE)
@@ -492,7 +548,9 @@ fun main() {
 
     var players = listOf(
         HumanPlayer("Bombero"),
-        AllwaysDrawBot("DrawBot2")
+        RandomBot("Randori1"),
+        RandomBot("Randori2"),
+        AllwaysDrawBot("Pintor")
     )
 
     Game(players).run()
