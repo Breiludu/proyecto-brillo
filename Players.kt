@@ -142,6 +142,114 @@ class AggressiveBot(name: String) : Player(name) {
 }
 
 /*
+ * --- Defensive Bot ---
+ *
+ * Informs before drawing: if he has See The Future, he plays it before drawing. Only draws if the card on top is
+ * safe
+ *
+ * Dodge: if there is an Exploding Kitten on top, Skip or Attack to avoid drawing it. If he doen's have any Defuse,
+ * Shuffle.
+ *
+ * No Defuse: avoids drawing if possible, as every draw could result in dead. With defuse, draws normally to save
+ * utility cards.
+ *
+ * Never attack by iniciative: never plays Favor or Kitten pairs/trios. Kittens serve as an exchange when someone
+ * requests a card.
+ *
+ * Nopes: uses it only to nope actions played agains him, and to rescue his own actions.
+ *
+ * Exploding Kitten to the bottom: allays sends exploding kitten at the bottom of the deck after drawing it.
+ *
+ */
+
+class DefensiveBot(name: String) : Player(name) {
+    override val isHuman = false
+
+    // Known card on top of the deck
+    private var knownTop: List<CardType>? = null
+
+    private fun play(card: CardType): Action {
+        knownTop = null
+        return Action(this, ActionType.PLAY_CARD, card)
+    }
+
+    private fun draw(): Action {
+        knownTop = null
+        return Action(this, ActionType.DRAW)
+    }
+
+    // Ends turn without drawing: Skip first, Attack if no other chance
+    private fun evade(): Action? = when {
+        has(CardType.SKIP) -> play(CardType.SKIP)
+        has(CardType.ATTACK) -> play(CardType.ATTACK)
+        else -> null
+    }
+
+    override fun act(game: Game): Action {
+        val known = knownTop
+        val hasDefuse = has(CardType.DEFUSE)
+
+        // Knows deck top cards
+        if (known != null && known.isNotEmpty()) {
+            if (known.first() != CardType.EXPLODING_KITTEN) return draw()
+
+            // Exploding Kitten on top: dodge if possible
+            evade()?.let { return it }
+            // Without defuse, try to shuffle.
+            if (!hasDefuse && has(CardType.SHUFFLE)) return play(CardType.SHUFFLE)
+            return draw()   // With defuse or without better options
+        }
+
+        // Don't know what's on top: gather information
+        if (has(CardType.SEE_THE_FUTURE) && game.getDeckSize() > 0) {
+            return Action(this, ActionType.PLAY_CARD, CardType.SEE_THE_FUTURE)
+        }
+
+        // Without defuse, try not to draw without information.
+        if (!hasDefuse) evade()?.let { return it }
+
+        return draw()
+    }
+
+    override fun nopes(action: Action, alreadyNoped: Boolean): Boolean = when {
+        // If my action was canceled, nope in response
+        action.actor == this -> alreadyNoped
+        // If I'm the target, nope in response
+        action.target == this -> !alreadyNoped
+        // If I'm not involved, save the nope
+        else -> false
+    }
+
+    // Give less valuable card
+    override fun favor(action: Action): CardType =
+        hand.minByOrNull { value(it) }!!
+
+    // Ask for valuable cards
+    override fun chooseCard(discardPile: List<CardType>): CardType =
+        discardPile.maxByOrNull { value(it) }!!
+
+    // Send Exploding Kitten to the bottom
+    override fun explodingKittenPosition(game: Game): Int {
+        knownTop = null
+        return game.getDeckSize()
+    }
+
+    override fun sawFuture(cards: List<CardType>) {
+        knownTop = cards
+    }
+
+    private fun value(card: CardType): Int = when (card) {
+        CardType.DEFUSE -> 100
+        CardType.SKIP -> 90
+        CardType.NOPE -> 80
+        CardType.ATTACK -> 70
+        CardType.SEE_THE_FUTURE, CardType.SHUFFLE -> 60
+        CardType.FAVOR -> 30
+        else -> 10 // gatos
+    }
+}
+
+/*
  * Allways plays draw action
  */
 class AllwaysDrawBot(name: String) : Player(name) {

@@ -389,7 +389,8 @@ fun main() {
 
     var players = listOf(
         HumanPlayer("Bombero"),
-        AggressiveBot("Cabrito"),
+        DefensiveBot("Calmito"),
+        // AggressiveBot("Cabrito"),
         // RandomBot("Randori1"),
         // RandomBot("Randori2"),
         // AllwaysDrawBot("Pintor")
