@@ -29,7 +29,6 @@ enum class CardType(val label: String, val isCat: Boolean = false) {
             SEE_THE_FUTURE   -> return "See the first three cards of the deck"
             NOPE             -> return "Denies an acction (only as a response)"
             else             -> return "Play them in groups to steal cards"
-            // TODO: Cinco cartas de gato
         }
     }
 
@@ -97,10 +96,10 @@ enum class TurnResult {
 
 // ---------------------------------------------------------------- Juego
 
+// TODO: private vars + getters
 class Game(val players: List<Player>) {
     // TODO: turn history
     val deck: Deck
-    // TODO: handle discard pile
     private val discardPile = mutableListOf<CardType>()
     private var playerTurn: Int
 
@@ -137,6 +136,13 @@ class Game(val players: List<Player>) {
         repeat(players.size - 1) { deck.insert(CardType.EXPLODING_KITTEN, 0) }
 
         deck.shuffle()
+
+        // !! CHEATS !!
+        // players[0].hand.add(CardType.TACOCAT)
+        // players[0].hand.add(CardType.CATTERMELON)
+        // players[0].hand.add(CardType.BEARD_CAT)
+        // players[0].hand.add(CardType.HAIRY_POTATO_CAT)
+        // players[0].hand.add(CardType.RAINBOW_RALPHING_CAT)
     }
 
     fun run() {
@@ -191,18 +197,21 @@ class Game(val players: List<Player>) {
             // Remove from player hand
             if(action.card != null && action.kittens == null) {
                 player.hand.remove(action.card)
+                discardPile.add(action.card)
             }
             if(action.kittens != null) {
-                for (kitten in action.kittens) { player.hand.remove(kitten) }
+                for (kitten in action.kittens) {
+                    player.hand.remove(kitten)
+                    discardPile.add(kitten)
+                }
             }
             
             // Nope round
             if(doNopeRound(action)) { continue }
 
             when(action.type) {
-                ActionType.DRAW         -> return drawCard(player)
                 ActionType.PLAY_KITTENS -> { playKittens(player, action) }
-                ActionType.PLAY_CARD        -> {
+                ActionType.PLAY_CARD    -> {
                     val result = playCard(player, action)
                     if(result != null) { return result }
                 }
@@ -271,12 +280,10 @@ class Game(val players: List<Player>) {
 
     // Kittens played logic
     private fun playKittens(player: Player, action: Action) {
-        val target = action.target!!
-
         when(action.kittens!!.size) {
             2 -> {
+                val target = action.target!!
                 announce(player, "${player.name} plays a pair of ${action.kittens[0].label} against ${target.name}.")
-                // TODO: pick number?
                 val stolen = target.hand.removeAt(Random.nextInt(target.hand.size))
                 player.hand.add(stolen)
                 announce(player, "${player.name} steals a card from ${target.name}.")
@@ -285,6 +292,7 @@ class Game(val players: List<Player>) {
             }
 
             3 -> {
+                val target = action.target!!
                 announce(player, "${player.name} plays a trio of ${action.kittens[0].label} against ${target.name}.")
                 announce(player, "${player.name} requests the card ${action.card!!.label}.")
                 if(target.has(action.card)) {
@@ -298,6 +306,7 @@ class Game(val players: List<Player>) {
 
             5 -> {
                 announce(player, "${player.name} plays five kittens.")
+                announce(player, "${player.name} takes a card from the discard pile.")
                 val chosen = player.chooseCard(discardPile)
                 discardPile.remove(chosen)
                 player.hand.add(chosen)
@@ -320,6 +329,7 @@ class Game(val players: List<Player>) {
                     noped = !noped
                     last = np
                     np.hand.remove(CardType.NOPE)
+                    discardPile.add(CardType.NOPE)
                     continue@outer
                 }
             }

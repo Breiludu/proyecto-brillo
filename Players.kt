@@ -5,8 +5,7 @@ abstract class Player(val name: String) {
     var alive = true
     abstract val isHuman: Boolean
 
-    fun has(card: CardType) = card in hand
-    fun count(card: CardType) = hand.count { it == card }
+    // --- API ---
 
     // TODO: do not pass in Game, reduce info available
     abstract fun act(game: Game): Action
@@ -16,6 +15,17 @@ abstract class Player(val name: String) {
     abstract fun chooseCard(discardPile: List<CardType>): CardType
     abstract fun explodingKittenPosition(game: Game): Int
     abstract fun sawFuture(cards: List<CardType>)
+
+    // --- Util ---
+
+    fun has(card: CardType) = card in hand
+    fun count(card: CardType) = hand.count { it == card }
+    fun canPlayFiveKittens(): Boolean {
+        if( has(CardType.TACOCAT)   && has(CardType.CATTERMELON) &&
+            has(CardType.BEARD_CAT) && has(CardType.HAIRY_POTATO_CAT) &&
+            has(CardType.RAINBOW_RALPHING_CAT)
+        ) { return true } else { return false }
+    }
 }
 
 // --- Bots ---
@@ -83,6 +93,11 @@ class RandomBot(name: String) : Player(name) {
                 else -> options.add(Action(this, ActionType.PLAY_CARD, card))
             }
         }
+        if(canPlayFiveKittens()) {
+            options.add(Action(this, ActionType.PLAY_KITTENS,
+                kittens = listOf( CardType.TACOCAT, CardType.CATTERMELON, CardType.BEARD_CAT,
+                CardType.HAIRY_POTATO_CAT, CardType.RAINBOW_RALPHING_CAT )))
+        }
 
         return options.random()
     }
@@ -111,12 +126,14 @@ class HumanPlayer(name: String) : Player(name) {
             println("\nHand of $name:")
             hand.sort()
 
+            // Print hand cards gouped
             val printableHand = hand.distinct()
             printableHand.forEachIndexed { i, card ->
                 println("  ${i+1}. ${count(card)}x ${card.label.padEnd(22)} (${card.getDesc()})")
             }
-
             println("  0. Draw a card and end turn")
+
+            // Input
             val choice = readInt("Choose an option: ", 0..printableHand.size)
             if (choice == 0) return Action(this, ActionType.DRAW)
 
@@ -127,31 +144,52 @@ class HumanPlayer(name: String) : Player(name) {
                     println("Defuse is used automatically when drawing an Exploding Kitten.")
                 card == CardType.NOPE ->
                     println("Nope is only played as a response to another player action.")
-                card.isCat && (count(card) < 2 || count(card) > 3) ->
-                    println("You need al least two ${card.label} to play them.")
+                card.isCat && (count(card) < 2 && !canPlayFiveKittens()) ->
+                    println("You need al least two ${card.label}, or five different kittens to play them.")
 
                 // --- Cats ---
                 card.isCat -> {
+                    // Ask for number of kittens to play
                     var kittensToPlay = 2
-                    if(count(card) > 2) {
+                    if(canPlayFiveKittens()) {
+                        while(true) {
+                            kittensToPlay = readInt("How many do you want to play? ", 2..5)
+                            if(kittensToPlay == 4) {
+                                println("Can only play 2, 3 or 5.")
+                            } else break
+                        }
+                    } else if(count(card) > 2) {
                         kittensToPlay = readInt("How many do you want to play? ", 2..3)
                     }
 
                     val kittens = mutableListOf<CardType>()
-                    repeat(kittensToPlay) { kittens.add(card) }
 
-                    // TODO: nobody selectable
-                    val target = selectPlayer(game)
-                    if(kittensToPlay == 2) {
-                        return Action(this, ActionType.PLAY_KITTENS, target = target, kittens = kittens)
+                    // Two or Three kittens
+                    if(kittensToPlay == 2 || kittensToPlay == 3) {
+                        repeat(kittensToPlay) { kittens.add(card) }
+
+                        // TODO: nobody selectable
+                        val target = selectPlayer(game)
+                        if(kittensToPlay == 2) {
+                            return Action(this, ActionType.PLAY_KITTENS, target = target, kittens = kittens)
+                        }
+
+                        // Three kittens
+                        print("Choose a card to steal: ")
+                        var stealCard = CardType.fromString(readln())
+                        return Action(this, ActionType.PLAY_KITTENS, card = stealCard, target = target, kittens = kittens)
+
+                    // Five Kittens
+                    } else {
+                        kittens.add(CardType.TACOCAT)
+                        kittens.add(CardType.CATTERMELON)
+                        kittens.add(CardType.BEARD_CAT)
+                        kittens.add(CardType.HAIRY_POTATO_CAT)
+                        kittens.add(CardType.RAINBOW_RALPHING_CAT)
+
+                        return Action(this, ActionType.PLAY_KITTENS, kittens = kittens)
                     }
-
-                    // Three kittens
-                    print("Choose a card to steal: ")
-                    var stealCard = CardType.fromString(readln())
-                    return Action(this, ActionType.PLAY_KITTENS, card = stealCard, target = target, kittens = kittens)
                 }
-                // TODO: five kittens
 
                 card == CardType.FAVOR -> {
                     val target = selectPlayer(game)
@@ -197,7 +235,16 @@ class HumanPlayer(name: String) : Player(name) {
     }
 
     override fun chooseCard(discardPile: List<CardType>): CardType {
-        return discardPile[Random.nextInt(discardPile.size)]
+        println("Select a card from the discard pile to get it: ")
+
+        // TODO: handle empty
+        val distinctPile = discardPile.distinct()
+        distinctPile.forEachIndexed { i, card ->
+            val n = discardPile.count { it == card }
+            println("  ${i+1}. ${n}x ${card.label.padEnd(22)} (${card.getDesc()})")
+        }
+        val choice = readInt("Choose an option: ", 1..distinctPile.size)
+        return distinctPile[choice - 1]
     }
 
     override fun explodingKittenPosition(game: Game): Int {
