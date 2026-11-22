@@ -487,3 +487,15 @@ class HumanPlayer(name: String) : Player(name) {
         return others[targetIdx-1]
     }
 }
+
+// --- Util ---
+
+fun readInt(msg: String, range: IntRange): Int {
+    while (true) {
+        print(msg)
+        val line = readlnOrNull() ?: continue
+        val n = line.trim().toIntOrNull()
+        if (n != null && n in range) return n
+        println("Select a number between ${range.first} and ${range.last}.")
+    }
+}

@@ -1,5 +1,4 @@
 import kotlin.random.Random
-import kotlin.system.exitProcess
 
 // ---------------------------------------------------------------- Cartas
 
@@ -106,18 +105,30 @@ data class ActionRecord(
 
 // ---------------------------------------------------------------- Juego
 
-class Game(private val players: List<Player>) {
-    private val deck: Deck
+data class PlayerSpec(val type: String, val name: String)
+
+data class GameConfig(
+    val players: List<PlayerSpec>,
+    val verbose: Boolean,
+    val iterations: Int
+)
+
+class Game(private val config: GameConfig) {
+    private val players = mutableListOf<Player>()
+    private val deck = Deck()
     private val discardPile = mutableListOf<CardType>()
     private val history = mutableListOf<ActionRecord>()
-    private var playerTurn: Int
+    private var playerTurn = 0
+
+    private var verbose = true
 
     private fun alivePlayers(): List<Player> = players.filter { it.alive }
     private fun targetsFor(p: Player) = alivePlayers().filter { it != p && it.hand.isNotEmpty() }
 
     init {
-        deck = Deck()
-        playerTurn = 0
+        // Config
+        players.addAll(config.players.map { createPlayer(it) })
+        verbose = config.verbose
 
         // Inicializar mazo y manos de jugadores
         val fullDeck = mutableListOf<CardType>()
@@ -154,7 +165,7 @@ class Game(private val players: List<Player>) {
         // players[0].hand.add(CardType.RAINBOW_RALPHING_CAT)
     }
 
-    fun run() {
+    fun run(): Player {
         var turnsLeft = 1
         
         while (alivePlayers().size > 1) {
@@ -172,9 +183,13 @@ class Game(private val players: List<Player>) {
             }
         }
 
-        println("\n==============================================")
-        println("  ${alivePlayers().first().name} wins the game!")
-        println("==============================================")
+        val winner = alivePlayers().first()
+
+        vprintln("\n==============================================")
+        vprintln("  ${winner.name} wins the game!")
+        vprintln("==============================================")
+
+        return winner
     }
 
     // Siguiente jugador (vivo)
@@ -182,18 +197,22 @@ class Game(private val players: List<Player>) {
         do { playerTurn = (playerTurn + 1) % players.size } while (!players[playerTurn].alive)
     }
 
+    private fun vprintln(msg: String) {
+        if(verbose) { println(msg) }
+    }
+
     private fun announce(player: Player, msg: String) {
-        println(msg)
-        if (!player.isHuman) Thread.sleep(600L)
+        vprintln(msg)
+        // if (!player.isHuman) Thread.sleep(600L)
     }
 
     private fun playTurn(player: Player, turnsLeft: Int): TurnResult {
         // Print turn info
-        println("\n----------------------------------------------")
+        vprintln("\n----------------------------------------------")
         val extra = if (turnsLeft > 1) " (le quedan $turnsLeft turnos)" else ""
-        println("Turn of ${player.name}$extra")
-        println("Cards in the deck: ${deck.getSize()}")
-        alivePlayers().forEach { println("  ${it.name}: ${it.hand.size} cards") }
+        vprintln("Turn of ${player.name}$extra")
+        vprintln("Cards in the deck: ${deck.getSize()}")
+        alivePlayers().forEach { vprintln("  ${it.name}: ${it.hand.size} cards") }
 
         while (true) {
             val action = player.act(this)
@@ -205,7 +224,7 @@ class Game(private val players: List<Player>) {
                 if(result == TurnResult.DEFUSED) {
                     history.add(ActionRecord(action, defused = true))
                 } else if(result == TurnResult.EXPLODED){
-                    history.add(ActionRecord(action, exploded = false))
+                    history.add(ActionRecord(action, exploded = true))
                 }
 
                 return result
@@ -248,7 +267,7 @@ class Game(private val players: List<Player>) {
         if (card != CardType.EXPLODING_KITTEN) {
             player.hand.add(card)
             announce(player, "${player.name} draws a card.")
-            if (player.isHuman) println("You drew: ${card.label}")
+            if (player.isHuman) vprintln("You drew: ${card.label}")
             return TurnResult.DREW
         }
 
@@ -288,11 +307,15 @@ class Game(private val players: List<Player>) {
                 announce(player, "The deck has been shuffled.")
             }
             CardType.FAVOR -> {
-                val given = target!!.favor(action)
-                target.hand.remove(given)
-                player.hand.add(given)
-                announce(player, "${target.name} gives a card to ${player.name}.")
-                if (player.isHuman) println("You received: ${given.label}")
+                if(target!!.hand.isEmpty()) {
+                    announce(player, "${target.name} has no cards to give.")
+                } else {
+                    val given = target.favor(action)
+                    target.hand.remove(given)
+                    player.hand.add(given)
+                    announce(player, "${target.name} gives a card to ${player.name}.")
+                    if (player.isHuman) vprintln("You received: ${given.label}")
+                }
             }
             else -> {}
         }
@@ -305,11 +328,15 @@ class Game(private val players: List<Player>) {
             2 -> {
                 val target = action.target!!
                 announce(player, "${player.name} plays a pair of ${action.kittens[0].label} against ${target.name}.")
+                if(target.hand.isEmpty()) {
+                    announce(player, "${target.name} has no cards to steal.")
+                    return
+                }
                 val stolen = target.hand.removeAt(Random.nextInt(target.hand.size))
                 player.hand.add(stolen)
                 announce(player, "${player.name} steals a card from ${target.name}.")
-                if (player.isHuman) println("You stole: ${stolen.label}")
-                if (target.isHuman) println("[${target.name}] They stole you: ${stolen.label}")
+                if (player.isHuman) vprintln("You stole: ${stolen.label}")
+                if (target.isHuman) vprintln("[${target.name}] They stole you: ${stolen.label}")
             }
 
             3 -> {
@@ -320,8 +347,8 @@ class Game(private val players: List<Player>) {
                     target.hand.remove(action.card)
                     player.hand.add(action.card)
                     announce(player, "${player.name} steals a card from ${target.name}.")
-                    if (player.isHuman) println("You stole: ${action.card.label}")
-                    if (target.isHuman) println("[${target.name}] They stole you: ${action.card.label}")
+                    if (player.isHuman) vprintln("You stole: ${action.card.label}")
+                    if (target.isHuman) vprintln("[${target.name}] They stole you: ${action.card.label}")
                 }
             }
 
@@ -346,7 +373,7 @@ class Game(private val players: List<Player>) {
 
             for (np in nopingPlayers) {
                 if(np.nopes(action, noped)) {
-                    println("${np.name} noped the action.")
+                    vprintln("${np.name} noped the action.")
                     noped = !noped
                     last = np
                     np.hand.remove(CardType.NOPE)
@@ -372,30 +399,5 @@ class Game(private val players: List<Player>) {
     public fun getTargetsFor(player: Player): List<Player> {
         return alivePlayers().filter { it != player && it.hand.size > 0 }
     }
-
 }
 
-fun readInt(msg: String, range: IntRange): Int {
-    while (true) {
-        print(msg)
-        val line = readlnOrNull() ?: continue
-        val n = line.trim().toIntOrNull()
-        if (n != null && n in range) return n
-        println("Select a number between ${range.first} and ${range.last}.")
-    }
-}
-
-fun main() {
-
-    var players = listOf(
-        HumanPlayer("Bombero"),
-        DefensiveBot("Calmito"),
-        // AggressiveBot("Cabrito"),
-        // RandomBot("Randori1"),
-        // RandomBot("Randori2"),
-        // AllwaysDrawBot("Pintor")
-    )
-
-    Game(players).run()
-
-}

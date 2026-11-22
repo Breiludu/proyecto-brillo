@@ -1,0 +1,12 @@
+# Available player types:
+# "human"     
+# "defensive" 
+# "aggressive"
+# "random"    
+# "alwaysdraw"
+
+[verbose] false
+[iterations] 100
+
+[player] defensive Calmito
+[player] aggressive Cabrito
