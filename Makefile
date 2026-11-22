@@ -6,8 +6,8 @@ run: build
 
 build: ExplodingKittens.jar
 
-ExplodingKittens.jar: ExplodingKittens.kt
-	../kotlin/bin/kotlinc ExplodingKittens.kt -include-runtime -d ExplodingKittens.jar
+ExplodingKittens.jar: ExplodingKittens.kt Players.kt
+	../kotlin/bin/kotlinc ExplodingKittens.kt Players.kt -include-runtime -d ExplodingKittens.jar
 
 clean:
 	rm -fv ./*.jar
