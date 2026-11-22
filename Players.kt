@@ -7,7 +7,6 @@ abstract class Player(val name: String) {
 
     // --- API ---
 
-    // TODO: do not pass in Game, reduce info available
     abstract fun act(game: Game): Action
     abstract fun nopes(action: Action, alreadyNoped: Boolean): Boolean
     // Action results
@@ -60,7 +59,7 @@ class RandomBot(name: String) : Player(name) {
     override val isHuman = false
 
     override fun act(game: Game): Action {
-        val targets = game.players.filter { it != this && it.alive && it.hand.isNotEmpty() }
+        val targets = game.getTargetsFor(this)
 
         // Every possible action
         val options = mutableListOf(Action(this, ActionType.DRAW))
@@ -111,7 +110,7 @@ class RandomBot(name: String) : Player(name) {
     override fun chooseCard(discardPile: List<CardType>): CardType = discardPile.random()
 
     override fun explodingKittenPosition(game: Game): Int =
-        Random.nextInt(0, game.deck.getSize() + 1)
+        Random.nextInt(0, game.getDeckSize() + 1)
 
     override fun sawFuture(cards: List<CardType>) { }
 }
@@ -134,9 +133,13 @@ class HumanPlayer(name: String) : Player(name) {
             println("  0. Draw a card and end turn")
 
             // Input
-            val choice = readInt("Choose an option: ", 0..printableHand.size)
+            val choice = readInt("Choose an option: ", -1..printableHand.size)
             if (choice == 0) return Action(this, ActionType.DRAW)
-
+            if (choice == -1) {
+                for (record in game.getHistory()) { println(record) }
+                continue
+            }
+            
             val card = printableHand[choice - 1]
             when {
                 // --- Not Allowed ---
@@ -249,7 +252,7 @@ class HumanPlayer(name: String) : Player(name) {
 
     override fun explodingKittenPosition(game: Game): Int {
         println("You defused an Exploding Kitten!!")
-        val choice = readInt("Where dou you want to place it? [0-${game.deck.getSize()-1}] ", 0..game.deck.getSize()-1)
+        val choice = readInt("Where dou you want to place it? [0-${game.getDeckSize()-1}] ", 0..game.getDeckSize()-1)
         return choice
     }
 
@@ -258,7 +261,7 @@ class HumanPlayer(name: String) : Player(name) {
     }
 
     private fun selectPlayer(game: Game): Player {
-        val others = game.players.filter { it != this && it.hand.size > 0 && it.alive }
+        val others = game.getTargetsFor(this)
         others.forEachIndexed { i, player ->
             println("${i+1}. ${player.name}")
         }

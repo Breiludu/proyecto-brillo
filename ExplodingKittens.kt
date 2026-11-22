@@ -86,21 +86,30 @@ data class Action(
     val target: Player? = null
 );
  
-// TODO: Use the Action played instead of returning this (maybe not possible)
 enum class TurnResult {
     DREW,
+    DEFUSED,
     SKIPPED,
     ATTACKED,
     EXPLODED;
 }
 
+data class ActionRecord(
+    val action: Action,
+    val defused: Boolean = false,
+    val exploded: Boolean = false,
+
+    val noped: Boolean = false,
+    // TODO: nopedBy
+    // val nopedBy: List<Player>?,
+)
+
 // ---------------------------------------------------------------- Juego
 
-// TODO: private vars + getters
-class Game(val players: List<Player>) {
-    // TODO: turn history
-    val deck: Deck
+class Game(private val players: List<Player>) {
+    private val deck: Deck
     private val discardPile = mutableListOf<CardType>()
+    private val history = mutableListOf<ActionRecord>()
     private var playerTurn: Int
 
     private fun alivePlayers(): List<Player> = players.filter { it.alive }
@@ -152,7 +161,7 @@ class Game(val players: List<Player>) {
             val player = players[playerTurn]
 
             when (playTurn(player, turnsLeft)) {
-                TurnResult.DREW, TurnResult.SKIPPED -> {
+                TurnResult.DREW, TurnResult.DEFUSED, TurnResult.SKIPPED -> {
                     turnsLeft--
                     if (turnsLeft == 0) { advance(); turnsLeft = 1 }
                 }
@@ -191,7 +200,15 @@ class Game(val players: List<Player>) {
 
             // Draw (can't be noped)
             if(action.type == ActionType.DRAW) {
-                return drawCard(player)
+                val result = drawCard(player)
+
+                if(result == TurnResult.DEFUSED) {
+                    history.add(ActionRecord(action, defused = true))
+                } else if(result == TurnResult.EXPLODED){
+                    history.add(ActionRecord(action, exploded = false))
+                }
+
+                return result
             }
 
             // Remove from player hand
@@ -207,7 +224,11 @@ class Game(val players: List<Player>) {
             }
             
             // Nope round
-            if(doNopeRound(action)) { continue }
+            if(doNopeRound(action)) {
+                history.add(ActionRecord(action, noped = true))
+                continue
+            }
+            history.add(ActionRecord(action))
 
             when(action.type) {
                 ActionType.PLAY_KITTENS -> { playKittens(player, action) }
@@ -240,7 +261,7 @@ class Game(val players: List<Player>) {
             val newPosition = player.explodingKittenPosition(this)
             deck.insert(CardType.EXPLODING_KITTEN, newPosition)
             announce(player, "${player.name} hides the kitten again in the deck...")
-            return TurnResult.DREW
+            return TurnResult.DEFUSED
         }
 
         // Exploding Kitten actually exploded
@@ -337,6 +358,18 @@ class Game(val players: List<Player>) {
         }
         return noped
     }
+
+    // --- Getters -> Public info players can get from game ---
+
+    public fun getPlayersSize(): Int = players.size
+    public fun getAlivePlayersSize(): Int = alivePlayers().size
+    public fun getDeckSize(): Int = deck.getSize()
+    public fun getHistory(): List<ActionRecord> = history
+
+    public fun getTargetsFor(player: Player): List<Player> {
+        return alivePlayers().filter { it != player && it.hand.size > 0 }
+    }
+
 }
 
 fun readInt(msg: String, range: IntRange): Int {
