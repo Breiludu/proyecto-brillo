@@ -361,11 +361,14 @@ class Game(private val players: List<Player>) {
 
     // --- Getters -> Public info players can get from game ---
 
+    // TODO: expose turn order / nex player to play
+
     public fun getPlayersSize(): Int = players.size
     public fun getAlivePlayersSize(): Int = alivePlayers().size
     public fun getDeckSize(): Int = deck.getSize()
     public fun getHistory(): List<ActionRecord> = history
 
+    // TODO: this makes hand contents vissible !!
     public fun getTargetsFor(player: Player): List<Player> {
         return alivePlayers().filter { it != player && it.hand.size > 0 }
     }
@@ -386,9 +389,10 @@ fun main() {
 
     var players = listOf(
         HumanPlayer("Bombero"),
-        RandomBot("Randori1"),
-        RandomBot("Randori2"),
-        AllwaysDrawBot("Pintor")
+        AggressiveBot("Cabrito"),
+        // RandomBot("Randori1"),
+        // RandomBot("Randori2"),
+        // AllwaysDrawBot("Pintor")
     )
 
     Game(players).run()

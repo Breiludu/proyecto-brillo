@@ -8,6 +8,7 @@ abstract class Player(val name: String) {
     // --- API ---
 
     abstract fun act(game: Game): Action
+    // TODO: players could need game info in almost every decision
     abstract fun nopes(action: Action, alreadyNoped: Boolean): Boolean
     // Action results
     abstract fun favor(action: Action): CardType
@@ -29,11 +30,120 @@ abstract class Player(val name: String) {
 
 // --- Bots ---
 
+/*
+ * --- Aggressive Bot ---
+ *
+ * Ofensive: allways uses attack if possible, if not, plays pairs/trios of kittens and favors against the player with
+ * most card in hand.
+ *
+ * Exploding Kitten on top: allways places exploding kitten on top after drawing it.
+ *
+ * Nope: nopes actions against himself. If his action is noped, nopes again in response.
+ *
+ * Defense: if next card is an exploding kitten, uses Skip or Shuffle.
+ *
+ * Favor: gives less valuable card, normally a cat.
+ */
 
+class AggressiveBot(name: String) : Player(name) {
+    override val isHuman = false
+
+    // Activates on See The Future if next draw is ExplodingKitten
+    private var dangerAhead = false
+
+    override fun act(game: Game): Action {
+        val danger = dangerAhead
+        dangerAhead = false
+
+        // Target player with most cards in hand
+        val target = game.getTargetsFor(this).maxByOrNull { it.hand.size }
+
+        // 1. Attack if possible
+        if (has(CardType.ATTACK)) return Action(this, ActionType.PLAY_CARD, CardType.ATTACK)
+
+        // 2. Dodge Exploding Kitten
+        if (danger) {
+            if (has(CardType.SKIP)) return Action(this, ActionType.PLAY_CARD, CardType.SKIP)
+            if (has(CardType.SHUFFLE)) return Action(this, ActionType.PLAY_CARD, CardType.SHUFFLE)
+        }
+
+        if (target != null) {
+            // 3. Steal: trio (requests Defuse) or pair
+            val cat = hand.filter { it.isCat }
+                .groupingBy { it }.eachCount()
+                .filter { it.value >= 2 }
+                .maxByOrNull { it.value }?.key
+
+            if (cat != null) {
+                return if (count(cat) >= 3) {
+                    Action(this, ActionType.PLAY_KITTENS, card = CardType.DEFUSE,
+                        kittens = List(3) { cat }, target = target)
+                } else {
+                    Action(this, ActionType.PLAY_KITTENS,
+                        kittens = List(2) { cat }, target = target)
+                }
+            }
+
+            // 4. Favor
+            if (has(CardType.FAVOR)) {
+                return Action(this, ActionType.PLAY_CARD, CardType.FAVOR, target = target)
+            }
+        }
+
+        // 5. See The Future to check danger
+        if (has(CardType.SEE_THE_FUTURE) && game.getDeckSize() > 0) {
+            return Action(this, ActionType.PLAY_CARD, CardType.SEE_THE_FUTURE)
+        }
+
+        // 6. Nothing else to do
+        return Action(this, ActionType.DRAW)
+    }
+
+    override fun nopes(action: Action, alreadyNoped: Boolean): Boolean = when {
+        // If my action was canceled, nope in response
+        action.actor == this -> alreadyNoped
+        // If already noped, do not nope
+        alreadyNoped -> false
+        // If I'm the target, nope in response
+        // TODO: If action == ATTACK and I'm next player -> nope (needs game info)
+        action.target == this -> true
+        else -> false
+    }
+
+    // Gives less valuable card
+    override fun favor(action: Action): CardType =
+        hand.minByOrNull { value(it) }!!
+
+    // Prioritises Defuse and Attack
+    override fun chooseCard(discardPile: List<CardType>): CardType =
+        discardPile.maxByOrNull { value(it) }!!
+
+    // Hide Exploding Kitten allways on top
+    override fun explodingKittenPosition(game: Game): Int {
+        // ...except if they attacked me: next to draw would be me
+        val attackedMe = game.getHistory().lastOrNull()?.let {
+            it.action.card == CardType.ATTACK && it.action.actor != this && !it.noped
+        } ?: false
+        return if (attackedMe) 1 else 0
+    }
+
+    override fun sawFuture(cards: List<CardType>) {
+        dangerAhead = cards.firstOrNull() == CardType.EXPLODING_KITTEN
+    }
+
+    private fun value(card: CardType): Int = when (card) {
+        CardType.DEFUSE -> 100
+        CardType.ATTACK -> 90
+        CardType.SKIP -> 80
+        CardType.NOPE -> 70
+        CardType.SHUFFLE, CardType.SEE_THE_FUTURE, CardType.FAVOR -> 50
+        else -> 10 // gatos
+    }
+}
 
 /*
  * Allways plays draw action
- * */
+ */
 class AllwaysDrawBot(name: String) : Player(name) {
     override val isHuman = false
 
@@ -54,7 +164,7 @@ class AllwaysDrawBot(name: String) : Player(name) {
 
 /*
  * Plays a random action between all possible actions
- * */
+ */
 class RandomBot(name: String) : Player(name) {
     override val isHuman = false
 
