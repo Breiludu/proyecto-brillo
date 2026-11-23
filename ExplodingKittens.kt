@@ -105,14 +105,6 @@ data class ActionRecord(
 
 // ---------------------------------------------------------------- Juego
 
-data class PlayerSpec(val type: String, val name: String)
-
-data class GameConfig(
-    val players: List<PlayerSpec>,
-    val verbose: Boolean,
-    val iterations: Int
-)
-
 class Game(private val config: GameConfig) {
     private val players = mutableListOf<Player>()
     private val deck = Deck()
@@ -121,6 +113,7 @@ class Game(private val config: GameConfig) {
     private var playerTurn = 0
 
     private var verbose = true
+    private var delay = 600
 
     private fun alivePlayers(): List<Player> = players.filter { it.alive }
     private fun targetsFor(p: Player) = alivePlayers().filter { it != p && it.hand.isNotEmpty() }
@@ -129,6 +122,7 @@ class Game(private val config: GameConfig) {
         // Config
         players.addAll(config.players.map { createPlayer(it) })
         verbose = config.verbose
+        delay = config.delay
 
         // Inicializar mazo y manos de jugadores
         val fullDeck = mutableListOf<CardType>()
@@ -203,7 +197,9 @@ class Game(private val config: GameConfig) {
 
     private fun announce(player: Player, msg: String) {
         vprintln(msg)
-        // if (!player.isHuman) Thread.sleep(600L)
+        if(verbose) {
+            if (!player.isHuman) Thread.sleep(delay.toLong())
+        }
     }
 
     private fun playTurn(player: Player, turnsLeft: Int): TurnResult {

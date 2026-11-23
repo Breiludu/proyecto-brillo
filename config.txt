@@ -6,7 +6,8 @@
 # "alwaysdraw"
 
 [verbose] false
-[iterations] 100
+[iterations] 1000
+[delay] 600
 
 [player] defensive Calmito
 [player] aggressive Cabrito
